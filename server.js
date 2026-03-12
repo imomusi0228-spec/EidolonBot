@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { startBot } = require('./src/bot');
 const apiRouter = require('./src/api');
+const cloudRouter = require('./src/cloud');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -15,6 +16,7 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api', apiRouter);
+app.use('/api/cloud', cloudRouter);
 
 // Start Bot
 startBot();

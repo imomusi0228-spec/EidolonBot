@@ -15,6 +15,8 @@ model User {
   licenses     License[]
   downloads    Download[]
   UserFeatures UserFeature[]
+  Presets      Preset[]
+  UserSetting  UserSetting?
 }
 
 model License {
@@ -52,6 +54,24 @@ model UserFeature {
   created_at DateTime @default(now())
 
   @@unique([user_id, feature_id])
+}
+
+model Preset {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id])
+  name       String
+  data       Json     // Store as JSON blob
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model UserSetting {
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @unique
+  user       User     @relation(fields: [user_id], references: [id])
+  settings   Json
+  updated_at DateTime @updatedAt
 }
 
 model Version {
