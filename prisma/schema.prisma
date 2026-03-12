@@ -11,9 +11,10 @@ model User {
   id         Int        @id @default(autoincrement())
   discord_id String     @unique
   username   String
-  created_at DateTime   @default(now())
-  licenses   License[]
-  downloads  Download[]
+  created_at   DateTime      @default(now())
+  licenses     License[]
+  downloads    Download[]
+  UserFeatures UserFeature[]
 }
 
 model License {
@@ -32,6 +33,25 @@ model Download {
   user      User     @relation(fields: [user_id], references: [id])
   product   String
   timestamp DateTime @default(now())
+}
+
+model Feature {
+  id           Int           @id @default(autoincrement())
+  slug         String        @unique // e.g., "auto_repair"
+  name         String
+  description  String?
+  UserFeatures UserFeature[]
+}
+
+model UserFeature {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id])
+  feature_id Int
+  feature    Feature  @relation(fields: [feature_id], references: [id])
+  created_at DateTime @default(now())
+
+  @@unique([user_id, feature_id])
 }
 
 model Version {

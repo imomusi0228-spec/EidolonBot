@@ -9,29 +9,43 @@ router.post('/license/verify', async (req, res) => {
     try {
         const license = await prisma.license.findUnique({
             where: { license_key },
-            include: { user: true }
+            include: { user: { include: { UserFeatures: { include: { feature: true } } } } }
         });
 
         if (!license) {
             return res.status(404).json({ valid: false, error: "License not found" });
         }
 
-        // ティア情報の正規化
+        // 基本ティアに基づく機能の一覧性
         const tier = license.tier;
-        const features = {
+        const baseFeatures = {
             autoRepair: tier === 'Complete',
             preview: ['Pro', 'Creator', 'Complete'].includes(tier),
             expressionGenerator: ['Pro', 'Creator', 'Complete'].includes(tier)
         };
 
+        // DBに登録された追加機能（DLC）の取得
+        const additionalFeatures = license.user ? license.user.UserFeatures.map(uf => uf.feature.slug) : [];
+
         return res.json({
             valid: true,
             tier: tier,
-            features: features,
+            baseFeatures: baseFeatures,
+            additionalFeatures: additionalFeatures,
             activated: license.activated
         });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// GET /features (Phase 3: DLC List)
+router.get('/features', async (req, res) => {
+    try {
+        const features = await prisma.feature.findMany();
+        res.json(features);
+    } catch (error) {
         res.status(500).json({ error: "Internal server error" });
     }
 });
