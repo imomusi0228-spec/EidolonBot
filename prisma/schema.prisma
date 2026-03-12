@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int        @id @default(autoincrement())
+  discord_id String     @unique
+  username   String
+  created_at DateTime   @default(now())
+  licenses   License[]
+  downloads  Download[]
+}
+
+model License {
+  id          Int      @id @default(autoincrement())
+  license_key String   @unique
+  tier        String
+  activated   Boolean  @default(false)
+  user_id     Int?
+  user        User?    @relation(fields: [user_id], references: [id])
+  created_at  DateTime @default(now())
+}
+
+model Download {
+  id        Int      @id @default(autoincrement())
+  user_id   Int
+  user      User     @relation(fields: [user_id], references: [id])
+  product   String
+  timestamp DateTime @default(now())
+}
+
+model Version {
+  id           Int      @id @default(autoincrement())
+  tool_version String
+  release_date DateTime @default(now())
+  download_url String
+}
