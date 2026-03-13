@@ -142,6 +142,23 @@ async function registerCommands() {
         {
             name: 'help',
             description: 'Botの使い方を表示します'
+        },
+        {
+            name: 'request-license',
+            description: 'ライセンスキーを即座に発行します',
+            options: [
+                {
+                    name: 'tier',
+                    type: 3, // STRING
+                    description: 'エディション (Pro, Creator, Lite)',
+                    required: false,
+                    choices: [
+                        { name: 'Professional', value: 'Pro' },
+                        { name: 'Creator', value: 'Creator' },
+                        { name: 'Lite', value: 'Lite' }
+                    ]
+                }
+            ]
         }
     ];
 
