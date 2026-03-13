@@ -56,7 +56,7 @@ router.post('/license/verify', async (req, res) => {
             activated: license.activated
         });
     } catch (error) {
-        console.error(error);
+        console.error("verify error:", error);
         res.status(500).json({ error: "サーバー内部エラーが発生しました。" });
     }
 });
@@ -129,6 +129,7 @@ router.get('/admin/licenses', adminAuth, async (req, res) => {
         });
         res.json(licenses);
     } catch (error) {
+        console.error("admin licenses error:", error);
         res.status(500).json({ error: "データ取得に失敗しました。" });
     }
 });
@@ -151,6 +152,7 @@ router.post('/admin/generate', adminAuth, async (req, res) => {
         });
         res.json({ success: true, license: newLicense });
     } catch (error) {
+        console.error("admin generate error:", error);
         res.status(500).json({ error: "キー生成に失敗しました。" });
     }
 });
@@ -165,6 +167,7 @@ router.post('/admin/reset', adminAuth, async (req, res) => {
         });
         res.json({ success: true, message: "マシン紐付けをリセットしました。" });
     } catch (error) {
+        console.error("admin reset error:", error);
         res.status(500).json({ error: "リセットに失敗しました。" });
     }
 });
