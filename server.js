@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const { startBot } = require('./src/bot');
 const apiRouter = require('./src/api');
 const cloudRouter = require('./src/cloud');
@@ -11,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => {
     res.send("Bot running and serving Ojou-Sama.");
 });
