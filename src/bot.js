@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const prisma = require('./database');
 const crypto = require('crypto');
 
@@ -46,6 +46,15 @@ client.on('interactionCreate', async interaction => {
             const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
             const licenseKey = `${prefix}${randomPart}`;
 
+            // ハッシュの生成 (UnityのLicenseManager.csに合わせる)
+            const salt = "EIDOLON_MIMIC_SECRET_STORM_2026";
+            const rawString = tier + licenseKey + salt;
+            const validationHash = crypto.createHash('md5').update(rawString, 'ascii').digest('hex').toLowerCase();
+
+            // ライセンスファイルの内容
+            const licenseText = `LICENSE_TYPE=${tier.toUpperCase()}\nLICENSE_KEY=${licenseKey}\nVALIDATION_HASH=${validationHash}\n`;
+            const licenseAttachment = new AttachmentBuilder(Buffer.from(licenseText), { name: 'EidolonMimicLicense.txt' });
+
             // トランザクション：キー発行 ＋ 注文を使用済みにマーク
             await prisma.$transaction([
                 prisma.license.create({
@@ -65,12 +74,15 @@ client.on('interactionCreate', async interaction => {
                 })
             ]);
 
-            // ユーザーにDMでキーを送信
+            // ユーザーにDMでファイルを送信
             try {
-                await interaction.user.send(`**祝！EidolonMimic ${tier} ライセンスが開放されました！**\n注文番号: \`${orderId}\` に対する貴方のキー: \`${licenseKey}\` です。大切になさってくださいわ。`);
-                await interaction.reply({ content: "注文の正当性が証明されましたわ！ライセンスキーをDMでお送りしましたので、ご確認ください！", ephemeral: true });
+                await interaction.user.send({
+                    content: `**祝！EidolonMimic ${tier} ライセンスが開放されました！**\n注文番号: \`${orderId}\` に対する貴方のライセンスファイルです。\n添付の \`EidolonMimicLicense.txt\` をUnityプロジェクトの \`Assets\` フォルダに配置してくださいわ。`,
+                    files: [licenseAttachment]
+                });
+                await interaction.reply({ content: "注文の正当性が証明されましたわ！ライセンスファイルをDMでお送りしましたので、ご確認ください！", ephemeral: true });
             } catch (dmError) {
-                await interaction.reply({ content: `認証に成功しましたが、DMをお送りできませんでした。サーバー内ユーザーからのDMを許可するように設定を確認してください。\n発行されたキー: \`${licenseKey}\``, ephemeral: true });
+                await interaction.reply({ content: `認証に成功しましたが、DMをお送りできませんでした。サーバー内ユーザーからのDMを許可するように設定を確認してください。\n以下のテキストを \`EidolonMimicLicense.txt\` という名前で保存し、Unityの \`Assets\` フォルダに入れてくださいわ：\n\`\`\`txt\n${licenseText}\n\`\`\``, ephemeral: true });
             }
         } catch (error) {
             console.error(error);
