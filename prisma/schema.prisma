@@ -29,6 +29,7 @@ model License {
   activated   Boolean  @default(false)
   user_id     Int?
   user        User?    @relation(fields: [user_id], references: [id])
+  machine_id  String?
   created_at  DateTime @default(now())
 }
 

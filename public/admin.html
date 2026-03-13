@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>EidolonMimic Pro - Empress Dashboard</title>
+    <style>
+        :root {
+            --bg: #0b0214;
+            --gold: #d4af37;
+            --purple: #3d0066;
+            --text: #e0e0e0;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Serif', 'Noto Serif JP', serif;
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            border-bottom: 2px solid var(--gold);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 { color: var(--gold); text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
+        .card {
+            background: linear-gradient(145deg, #15052a, #0b0214);
+            border: 1px solid var(--purple);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--purple);
+        }
+        th { color: var(--gold); font-weight: bold; }
+        button {
+            background-color: var(--gold);
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: white;
+            box-shadow: 0 0 15px var(--gold);
+        }
+        .btn-reset {
+            background-color: #721c24;
+            color: white;
+        }
+        input, select {
+            background-color: #1a0833;
+            border: 1px solid var(--gold);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>💎 Empress Dashboard</h1>
+        <div id="auth-section">
+            <input type="password" id="admin-token" placeholder="Admin Tokenを入力してください">
+            <button onclick="loadLicenses()">ログイン</button>
+        </div>
+    </header>
+
+    <div class="card">
+        <h2>✨ ライセンス発行の儀</h2>
+        <select id="tier-select">
+            <option value="Pro">Professional</option>
+            <option value="Creator">Creator</option>
+            <option value="Complete">Complete</option>
+        </select>
+        <button onclick="generateKey()">新規キーを創造する</button>
+    </div>
+
+    <div class="card">
+        <h2>📋 ライセンス監査台帳</h2>
+        <table id="license-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>キー</th>
+                    <th>ティア</th>
+                    <th>状態</th>
+                    <th>デバイスID</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- ここに流し込まれますわ -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function fetchAPI(endpoint, options = {}) {
+            const token = document.getElementById('admin-token').value;
+            const res = await fetch('/api' + endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-Admin-Token': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (res.status === 401) alert('お嬢様以外、認められません。');
+            return res.json();
+        }
+
+        async function loadLicenses() {
+            const data = await fetchAPI('/admin/licenses');
+            const tbody = document.querySelector('#license-table tbody');
+            tbody.innerHTML = '';
+            data.forEach(lic => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${lic.id}</td>
+                    <td><code>${lic.license_key}</code></td>
+                    <td>${lic.tier}</td>
+                    <td>${lic.activated ? '✅ 有効' : '💤 待機'}</td>
+                    <td>${lic.machine_id || '-'}</td>
+                    <td>
+                        <button class="btn-reset" onclick="resetLicense(${lic.id})">紐付けリセット</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function generateKey() {
+            const tier = document.getElementById('tier-select').value;
+            const res = await fetchAPI('/admin/generate', {
+                method: 'POST',
+                body: JSON.stringify({ tier })
+            });
+            if (res.success) {
+                alert('新しいキーをこの世に生み出しました：' + res.license.license_key);
+                loadLicenses();
+            }
+        }
+
+        async function resetLicense(id) {
+            if (!confirm('その者のPC紐付けを抹消してもよろしいですか？')) return;
+            const res = await fetchAPI('/admin/reset', {
+                method: 'POST',
+                body: JSON.stringify({ id })
+            });
+            if (res.success) {
+                alert('紐付けを断ち切りました。');
+                loadLicenses();
+            }
+        }
+    </script>
+</body>
+</html>

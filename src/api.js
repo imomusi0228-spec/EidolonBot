@@ -1,6 +1,18 @@
-const express = require('express');
 const prisma = require('./database');
+const crypto = require('crypto');
 const router = express.Router();
+
+const ADMIN_TOKEN = "Meltank0819";
+
+// Admin Auth Middleware
+const adminAuth = (req, res, next) => {
+    const token = req.headers['x-admin-token'];
+    if (token === ADMIN_TOKEN) {
+        next();
+    } else {
+        res.status(401).json({ error: "お嬢様以外は立ち入り禁止です。" });
+    }
+};
 
 // POST /license/verify
 router.post('/license/verify', async (req, res) => {
@@ -13,7 +25,13 @@ router.post('/license/verify', async (req, res) => {
         });
 
         if (!license) {
-            return res.status(404).json({ valid: false, error: "License not found" });
+            return res.status(404).json({ valid: false, error: "ライセンスキーが見つかりません。正しいキーを入力してください。" });
+        }
+
+        // マシンIDのチェック (簡易実装: 既にアクティベート済みの場合は一致するか確認)
+        // 本来はマシンのスロット管理などを行う
+        if (license.activated && license.machine_id && license.machine_id !== machine_id) {
+            return res.status(403).json({ valid: false, error: "このライセンスは別のデバイスで使用されています。" });
         }
 
         // 基本ティアに基づく機能の一覧性
@@ -36,7 +54,7 @@ router.post('/license/verify', async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: "サーバー内部エラーが発生しました。" });
     }
 });
 
@@ -94,6 +112,57 @@ router.get('/update/check', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// --- Admin Endpoints ---
+
+// GET /admin/licenses
+router.get('/admin/licenses', adminAuth, async (req, res) => {
+    try {
+        const licenses = await prisma.license.findMany({
+            include: { user: true },
+            orderBy: { created_at: 'desc' }
+        });
+        res.json(licenses);
+    } catch (error) {
+        res.status(500).json({ error: "データ取得に失敗しました。" });
+    }
+});
+
+// POST /admin/generate
+router.post('/admin/generate', adminAuth, async (req, res) => {
+    const { tier } = req.body;
+    const prefix = {
+        'Pro': 'EMPRO-',
+        'Creator': 'EMCREATOR-',
+        'Complete': 'EMCOMP-'
+    }[tier] || 'EMDLC-';
+    
+    const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
+    const license_key = `${prefix}${randomPart}`;
+
+    try {
+        const newLicense = await prisma.license.create({
+            data: { license_key, tier, activated: false }
+        });
+        res.json({ success: true, license: newLicense });
+    } catch (error) {
+        res.status(500).json({ error: "キー生成に失敗しました。" });
+    }
+});
+
+// POST /admin/reset
+router.post('/admin/reset', adminAuth, async (req, res) => {
+    const { id } = req.body;
+    try {
+        await prisma.license.update({
+            where: { id: parseInt(id) },
+            data: { machine_id: null, activated: false }
+        });
+        res.json({ success: true, message: "マシン紐付けをリセットしました。" });
+    } catch (error) {
+        res.status(500).json({ error: "リセットに失敗しました。" });
     }
 });
 

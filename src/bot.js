@@ -79,6 +79,24 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
+    if (commandName === 'ticket') {
+        const title = interaction.options.getString('title');
+        try {
+            const thread = await interaction.channel.threads.create({
+                name: `支援チケット-${interaction.user.username}-${title}`,
+                autoArchiveDuration: 1440,
+                reason: `Support ticket requested by ${interaction.user.tag}`,
+            });
+            
+            await thread.members.add(interaction.user.id);
+            await thread.send(`**${interaction.user.toString()} 様、お問い合わせありがとうございます。**\n詳細をこちらに記入してお待ちください。`);
+            await interaction.reply({ content: `チケットを作成しました: ${thread.toString()}`, ephemeral: true });
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ content: "チケットの作成に失敗しました。権限を確認してください。", ephemeral: true });
+        }
+    }
+
     if (commandName === 'help') {
         const helpText = (
             "**EidolonBot ヘルプメニュー (Node.js版)**\n" +
@@ -108,6 +126,18 @@ async function registerCommands() {
         {
             name: 'download',
             description: '各バージョンのリンクを表示します'
+        },
+        {
+            name: 'ticket',
+            description: 'サポートチケットを作成します',
+            options: [
+                {
+                    name: 'title',
+                    type: 3, // STRING
+                    description: '相談内容の要約',
+                    required: true
+                }
+            ]
         },
         {
             name: 'help',
