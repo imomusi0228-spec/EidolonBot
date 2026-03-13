@@ -1,5 +1,8 @@
 const prisma = require('./database');
 const crypto = require('crypto');
+const express = require('express');
+const { parse } = require('csv-parse/sync');
+const fs = require('fs');
 const router = express.Router();
 
 const ADMIN_TOKEN = "Meltank0819";
@@ -163,6 +166,44 @@ router.post('/admin/reset', adminAuth, async (req, res) => {
         res.json({ success: true, message: "マシン紐付けをリセットしました。" });
     } catch (error) {
         res.status(500).json({ error: "リセットに失敗しました。" });
+    }
+});
+
+// POST /admin/booth/import
+router.post('/admin/booth/import', adminAuth, async (req, res) => {
+    const { csvData } = req.body;
+    
+    try {
+        const records = parse(csvData, {
+            columns: true,
+            skip_empty_lines: true
+        });
+
+        let count = 0;
+        for (const record of records) {
+            // BoothのCSV形式に合わせたマッピング
+            // 注文番号, 商品名, 個数 などの列名を想定
+            const orderId = record['注文番号'] || record['Order ID'];
+            const productName = record['商品名'] || record['Product Name'];
+            
+            if (orderId && productName) {
+                await prisma.boothOrder.upsert({
+                    where: { order_id: orderId },
+                    update: { product_name: productName },
+                    create: {
+                        order_id: orderId,
+                        product_name: productName,
+                        quantity: parseInt(record['個数'] || record['Quantity'] || "1")
+                    }
+                });
+                count++;
+            }
+        }
+
+        res.json({ success: true, message: `${count}件の注文データをインポートしました。` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "インポートに失敗しました。" });
     }
 });
 

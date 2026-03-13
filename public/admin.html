@@ -168,6 +168,24 @@
                 loadLicenses();
             }
         }
+
+        async function importCSV() {
+            const fileInput = document.getElementById('csv-file');
+            if (!fileInput.files[0]) return alert('CSVファイルを選択してください。');
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const csvData = e.target.result;
+                const res = await fetchAPI('/admin/booth/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ csvData })
+                });
+                if (res.success) {
+                    alert(res.message);
+                }
+            };
+            reader.readAsText(fileInput.files[0]);
+        }
     </script>
 </body>
 </html>

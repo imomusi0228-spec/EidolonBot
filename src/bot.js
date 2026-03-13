@@ -1,23 +1,14 @@
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
 const prisma = require('./database');
+const crypto = require('crypto');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMessages
     ]
 });
-
-const ROLE_IDS = {
-    LITE: process.env.ROLE_LITE,
-    PRO: process.env.ROLE_PRO,
-    CREATOR: process.env.ROLE_CREATOR,
-    COMPLETE: process.env.ROLE_COMPLETE
-};
-
-const ADMIN_LOG_CHANNEL_ID = process.env.ADMIN_LOG_CHANNEL_ID;
 
 client.once('ready', () => {
     console.log(`Bot logged in as ${client.user.tag}`);
@@ -28,173 +19,119 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName } = interaction;
 
-    if (commandName === 'verify') {
-        const key = interaction.options.getString('key').toUpperCase().trim();
+    if (commandName === 'license') {
+        const orderId = interaction.options.getString('order_id').trim();
         
         try {
-            const license = await prisma.license.findUnique({
-                where: { license_key: key }
+            // Booth注文データの照合
+            const order = await prisma.boothOrder.findUnique({
+                where: { order_id: orderId }
             });
 
-            if (!license) {
-                return interaction.reply({ content: "認証に失敗しました。正しいライセンスキーを入力してください。", ephemeral: true });
+            if (!order) {
+                return interaction.reply({ content: "その注文番号は台帳に存在しませんわ。Boothの購入履歴を再度ご確認ください。", ephemeral: true });
             }
 
-            const role_id = ROLE_IDS[license.tier];
-            if (!role_id) {
-                return interaction.reply({ content: "システムエラー：ロール設定が見つかりません。", ephemeral: true });
+            if (order.claimed) {
+                return interaction.reply({ content: "その注文番号は既にライセンス発行に使用されていますわ。お困りの場合はお嬢様に相談してください。", ephemeral: true });
             }
 
-            const member = await interaction.guild.members.fetch(interaction.user.id);
-            const role = interaction.guild.roles.cache.get(role_id);
+            // 商品名からティアを判定
+            let tier = "Pro";
+            if (order.product_name.includes("Creator")) tier = "Creator";
+            if (order.product_name.includes("Complete")) tier = "Complete";
 
-            if (!role) {
-                return interaction.reply({ content: "エラー：サーバー上に該当するロールが見つかりませんでした。", ephemeral: true });
+            // ライセンスキーの生成
+            const prefix = `EM${tier.toUpperCase()}-`;
+            const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
+            const licenseKey = `${prefix}${randomPart}`;
+
+            // トランザクション：キー発行 ＋ 注文を使用済みにマーク
+            await prisma.$transaction([
+                prisma.license.create({
+                    data: { 
+                        license_key: licenseKey, 
+                        tier, 
+                        activated: false,
+                        user: { connectOrCreate: { 
+                            where: { discord_id: interaction.user.id },
+                            create: { discord_id: interaction.user.id, username: interaction.user.username }
+                        }}
+                    }
+                }),
+                prisma.boothOrder.update({
+                    where: { order_id: orderId },
+                    data: { claimed: true, claimed_at: new Date() }
+                })
+            ]);
+
+            // ユーザーにDMでキーを送信
+            try {
+                await interaction.user.send(`**祝！EidolonMimic ${tier} ライセンスが開放されました！**\n注文番号: \`${orderId}\` に対する貴方のキー: \`${licenseKey}\` です。大切になさってくださいわ。`);
+                await interaction.reply({ content: "注文の正当性が証明されましたわ！ライセンスキーをDMでお送りしましたので、ご確認ください！", ephemeral: true });
+            } catch (dmError) {
+                await interaction.reply({ content: `認証に成功しましたが、DMをお送りできませんでした。サーバー内ユーザーからのDMを許可するように設定を確認してください。\n発行されたキー: \`${licenseKey}\``, ephemeral: true });
             }
-
-            await member.roles.add(role);
-
-            // DB更新（アクティベート済みとする）
-            await prisma.license.update({
-                where: { license_key: key },
-                data: { activated: true, user: { connectOrCreate: { 
-                    where: { discord_id: interaction.user.id },
-                    create: { discord_id: interaction.user.id, username: interaction.user.username }
-                }}}
-            });
-
-            await interaction.reply({ content: `認証が完了しました。【${license.tier} User】ロールを付与しました。`, ephemeral: true });
         } catch (error) {
             console.error(error);
-            interaction.reply({ content: "エラーが発生しました。管理者にお問い合わせください。", ephemeral: true });
+            await interaction.reply({ content: "処理中にエラーが発生しました。お嬢様に報告しておきますね。", ephemeral: true });
         }
     }
 
     if (commandName === 'download') {
         const embed = new EmbedBuilder()
-            .setTitle("EidolonMimic ダウンロードリンク")
-            .setColor(0x0099FF)
+            .setTitle("EidolonMimic 公式配布所")
+            .setColor(0x00FF99)
+            .setDescription("最新の成果物をこちらから手に取ることができますわ。")
             .addFields(
-                { name: "Lite (無料版)", value: "[ダウンロード](https://booth.pm/ja/items/example_lite)" },
-                { name: "Pro / Creator / Complete", value: "[Booth 商品ページ](https://booth.pm/ja/items/example_pro)\n※購入済みのバージョンのファイルをダウンロードしてください。" }
+                { name: "GitHub v2.0", value: "[ダウンロードはこちら](https://github.com/dansy/EidolonMimic/releases/latest)" },
+                { name: "Booth", value: "[商品ページ](https://booth.pm/ja/items/example)" }
             );
         await interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-
-    if (commandName === 'ticket') {
-        const title = interaction.options.getString('title');
-        try {
-            const thread = await interaction.channel.threads.create({
-                name: `支援チケット-${interaction.user.username}-${title}`,
-                autoArchiveDuration: 1440,
-                reason: `Support ticket requested by ${interaction.user.tag}`,
-            });
-            
-            await thread.members.add(interaction.user.id);
-            await thread.send(`**${interaction.user.toString()} 様、お問い合わせありがとうございます。**\n詳細をこちらに記入してお待ちください。`);
-            await interaction.reply({ content: `チケットを作成しました: ${thread.toString()}`, ephemeral: true });
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: "チケットの作成に失敗しました。権限を確認してください。", ephemeral: true });
-        }
-    }
-
-    if (commandName === 'help') {
-        await interaction.reply({ content: helpText, ephemeral: true });
-    }
-
-    if (commandName === 'request-license') {
-        const tier = interaction.options.getString('tier') || 'Pro';
-        
-        try {
-            // 不正防止：既にライセンスを持っているかチェック
-            const existingUser = await prisma.user.findUnique({
-                where: { discord_id: interaction.user.id },
-                include: { licenses: true }
-            });
-
-            if (existingUser && existingUser.licenses.some(l => l.tier === tier)) {
-                return interaction.reply({ content: `お嬢様から既に${tier}版の許可を頂いているようですわ。一つのアカウントで複数のキーは発行できません。`, ephemeral: true });
-            }
-
-            const crypto = require('crypto');
-            const prefix = tier === 'Pro' ? 'EMPRO-' : (tier === 'Creator' ? 'EMCREATOR-' : 'EMDLC-');
-            const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
-            const license_key = `${prefix}${randomPart}`;
-
-            // DBに登録（ユーザーと紐付け）
-            await prisma.license.create({
-                data: { 
-                    license_key, 
-                    tier, 
-                    activated: false,
-                    user: { connectOrCreate: { 
-                        where: { discord_id: interaction.user.id },
-                        create: { discord_id: interaction.user.id, username: interaction.user.username }
-                    }}
-                }
-            });
-
-            // ユーザーにDM送信
-            try {
-                await interaction.user.send(`**EidolonMimic ${tier} ライセンスが発行されました！**\nあなたのライセンスキー: \`${license_key}\`\nUnityツールのライセンス設定画面でこのキーを入力してください。`);
-                await interaction.reply({ content: "ライセンスを発行し、DMで送信しました。有効に活用してくださいね。", ephemeral: true });
-                
-                // 管理者（お嬢様）へ通知
-                if (ADMIN_LOG_CHANNEL_ID) {
-                    const logChannel = await client.channels.fetch(ADMIN_LOG_CHANNEL_ID);
-                    if (logChannel) {
-                        const logEmbed = new EmbedBuilder()
-                            .setTitle("📋 ライセンス自動発行ログ")
-                            .setColor(0x00FF00)
-                            .addFields(
-                                { name: "ユーザー", value: `${interaction.user.tag} (${interaction.user.id})` },
-                                { name: "ティア", value: tier },
-                                { name: "発行キー", value: `\`${license_key}\`` }
-                            )
-                            .setTimestamp();
-                        await logChannel.send({ embeds: [logEmbed] });
-                    }
-                }
-            } catch (dmError) {
-                console.error("DM送信失敗:", dmError);
-                await interaction.reply({ content: `ライセンスを発行しましたが、DMが送れませんでした。設定（サーバー内ユーザーのDM許可）を確認してください。\nキー: \`${license_key}\``, ephemeral: true });
-            }
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: "ライセンスの発行中にエラーが発生しました。お嬢様に報告しておきますね。", ephemeral: true });
-        }
     }
 });
 
 async function registerCommands() {
     const commands = [
         {
-            name: 'verify',
-            description: 'ライセンスキーを認証します',
+            name: 'license',
+            description: 'Boothの注文番号からライセンスを発行します',
             options: [
                 {
-                    name: 'key',
+                    name: 'order_id',
                     type: 3, // STRING
-                    description: 'ライセンスキー',
+                    description: 'Boothの注文番号（8桁の数字）',
                     required: true
                 }
             ]
         },
         {
             name: 'download',
-            description: '各バージョンのリンクを表示します'
-        },
-        {
-            name: 'ticket',
-            description: 'サポートチケットを作成します',
-            options: [
-                {
-                    name: 'title',
-                    type: 3, // STRING
-                    description: '相談内容の要約',
-                    required: true
-                }
+            description: '最新版のダウンロード先を表示します'
+        }
+    ];
+
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+    try {
+        console.log('Refreshing application commands...');
+        await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands },
+        );
+        console.log('Successfully reloaded commands.');
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+module.exports = {
+    startBot: () => {
+        client.login(process.env.DISCORD_TOKEN);
+        registerCommands();
+    }
+};
+             }
             ]
         },
         {

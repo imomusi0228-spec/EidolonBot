@@ -115,3 +115,13 @@ model Version {
   release_date DateTime @default(now())
   download_url String
 }
+
+model BoothOrder {
+  id           Int      @id @default(autoincrement())
+  order_id     String   @unique
+  product_name String
+  quantity     Int      @default(1)
+  claimed      Boolean  @default(false)
+  claimed_at   DateTime?
+  created_at   DateTime @default(now())
+}
