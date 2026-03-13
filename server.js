@@ -11,8 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
-
-// Keep-Alive / Health Check
+app.use(express.static('public'));
 app.get('/', (req, res) => {
     res.send("Bot running and serving Ojou-Sama.");
 });
