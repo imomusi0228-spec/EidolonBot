@@ -17,6 +17,8 @@ const ROLE_IDS = {
     COMPLETE: process.env.ROLE_COMPLETE
 };
 
+const ADMIN_LOG_CHANNEL_ID = process.env.ADMIN_LOG_CHANNEL_ID;
+
 client.once('ready', () => {
     console.log(`Bot logged in as ${client.user.tag}`);
 });
@@ -98,14 +100,70 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (commandName === 'help') {
-        const helpText = (
-            "**EidolonBot ヘルプメニュー (Node.js版)**\n" +
-            "`/verify [key]` : ライセンスキーを認証して、専用チャンネルを解放します。\n" +
-            "`/download` : 各バージョンのリンクを表示します。\n" +
-            "`/ticket [件名]` : サポートチケットを作成します（スレッド形式）。\n" +
-            "不明点がある場合は、サポートチャンネルでご質問ください。"
-        );
         await interaction.reply({ content: helpText, ephemeral: true });
+    }
+
+    if (commandName === 'request-license') {
+        const tier = interaction.options.getString('tier') || 'Pro';
+        
+        try {
+            // 不正防止：既にライセンスを持っているかチェック
+            const existingUser = await prisma.user.findUnique({
+                where: { discord_id: interaction.user.id },
+                include: { licenses: true }
+            });
+
+            if (existingUser && existingUser.licenses.some(l => l.tier === tier)) {
+                return interaction.reply({ content: `お嬢様から既に${tier}版の許可を頂いているようですわ。一つのアカウントで複数のキーは発行できません。`, ephemeral: true });
+            }
+
+            const crypto = require('crypto');
+            const prefix = tier === 'Pro' ? 'EMPRO-' : (tier === 'Creator' ? 'EMCREATOR-' : 'EMDLC-');
+            const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
+            const license_key = `${prefix}${randomPart}`;
+
+            // DBに登録（ユーザーと紐付け）
+            await prisma.license.create({
+                data: { 
+                    license_key, 
+                    tier, 
+                    activated: false,
+                    user: { connectOrCreate: { 
+                        where: { discord_id: interaction.user.id },
+                        create: { discord_id: interaction.user.id, username: interaction.user.username }
+                    }}
+                }
+            });
+
+            // ユーザーにDM送信
+            try {
+                await interaction.user.send(`**EidolonMimic ${tier} ライセンスが発行されました！**\nあなたのライセンスキー: \`${license_key}\`\nUnityツールのライセンス設定画面でこのキーを入力してください。`);
+                await interaction.reply({ content: "ライセンスを発行し、DMで送信しました。有効に活用してくださいね。", ephemeral: true });
+                
+                // 管理者（お嬢様）へ通知
+                if (ADMIN_LOG_CHANNEL_ID) {
+                    const logChannel = await client.channels.fetch(ADMIN_LOG_CHANNEL_ID);
+                    if (logChannel) {
+                        const logEmbed = new EmbedBuilder()
+                            .setTitle("📋 ライセンス自動発行ログ")
+                            .setColor(0x00FF00)
+                            .addFields(
+                                { name: "ユーザー", value: `${interaction.user.tag} (${interaction.user.id})` },
+                                { name: "ティア", value: tier },
+                                { name: "発行キー", value: `\`${license_key}\`` }
+                            )
+                            .setTimestamp();
+                        await logChannel.send({ embeds: [logEmbed] });
+                    }
+                }
+            } catch (dmError) {
+                console.error("DM送信失敗:", dmError);
+                await interaction.reply({ content: `ライセンスを発行しましたが、DMが送れませんでした。設定（サーバー内ユーザーのDM許可）を確認してください。\nキー: \`${license_key}\``, ephemeral: true });
+            }
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ content: "ライセンスの発行中にエラーが発生しました。お嬢様に報告しておきますね。", ephemeral: true });
+        }
     }
 });
 
