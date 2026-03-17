@@ -2,143 +2,324 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EidolonMimic Pro - Empress Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0b0214;
+            --bg-deep: #05010a;
+            --bg-card: rgba(20, 5, 40, 0.7);
             --gold: #d4af37;
-            --purple: #3d0066;
-            --text: #e0e0e0;
+            --gold-bright: #ffdf00;
+            --purple: #4b0082;
+            --purple-light: #7b2cbf;
+            --text-main: #f0f0f0;
+            --text-dim: #b0b0b0;
+            --accent: #E91E63;
         }
+
+        * { box-sizing: border-box; }
+
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Serif', 'Noto Serif JP', serif;
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(75, 0, 130, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(233, 30, 99, 0.1) 0%, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Noto Serif JP', serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
+
         header {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
             border-bottom: 2px solid var(--gold);
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            padding: 20px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
         }
-        h1 { color: var(--gold); text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
-        .card {
-            background: linear-gradient(145deg, #15052a, #0b0214);
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: var(--gold);
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        input[type="text"], select {
+            background: rgba(26, 8, 51, 0.8);
             border: 1px solid var(--purple);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            outline: none;
+            transition: 0.3s;
         }
+
+        input:focus, select:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--gold), #b8860b);
+            color: #000;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.4s;
+            font-family: 'Noto Serif JP', serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+            background: var(--gold-bright);
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            color: var(--gold);
+            border-left: 4px solid var(--gold);
+            padding-left: 15px;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 22px;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            align-items: flex-end;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 20px;
         }
-        th, td {
-            padding: 12px;
+
+        th {
             text-align: left;
-            border-bottom: 1px solid var(--purple);
+            color: var(--gold);
+            padding: 15px;
+            border-bottom: 2px solid var(--purple);
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
         }
-        th { color: var(--gold); font-weight: bold; }
-        button {
-            background-color: var(--gold);
-            color: black;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(123, 44, 191, 0.3);
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        tr:hover td {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.03);
+        }
+
+        code {
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: var(--gold-bright);
+            font-family: monospace;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: bold;
-            border-radius: 4px;
-            transition: 0.3s;
+            text-transform: uppercase;
         }
-        button:hover {
-            background-color: white;
-            box-shadow: 0 0 15px var(--gold);
+
+        .badge-free { background: #444; color: #aaa; }
+        .badge-standard { background: #1a4d80; color: #fff; }
+        .badge-pro { background: #5a189a; color: #fff; }
+        .badge-ultimate { background: #856404; color: #ffd700; border: 1px solid #ffd700; }
+
+        .btn-action {
+            padding: 5px 12px;
+            font-size: 12px;
+            margin-right: 5px;
         }
+
         .btn-reset {
-            background-color: #721c24;
-            color: white;
-        }
-        input, select {
-            background-color: #1a0833;
+            background: #4b0082;
+            color: #fff;
             border: 1px solid var(--gold);
-            color: white;
-            padding: 8px;
-            border-radius: 4px;
+        }
+
+        .btn-delete {
+            background: linear-gradient(135deg, #721c24, #a71d2a);
+            color: #fff;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--purple-light); }
+        
+        .status-msg {
+            color: var(--gold);
+            font-size: 14px;
+            margin-left: 20px;
         }
     </style>
 </head>
 <body>
     <header>
         <h1>💎 Empress Dashboard</h1>
-        <div id="auth-section">
-            <input type="password" id="admin-token" placeholder="Admin Tokenを入力してください">
-            <button onclick="loadLicenses()">ログイン</button>
-        </div>
+        <div id="status-display" class="status-msg">お嬢様、自動ログインいたしましたわ。</div>
     </header>
 
-    <div class="card">
-        <h2>✨ ライセンス発行の儀</h2>
-        <select id="tier-select">
-            <option value="Pro">Professional</option>
-            <option value="Creator">Creator</option>
-            <option value="Complete">Complete</option>
-        </select>
-        <button onclick="generateKey()">新規キーを創造する</button>
-    </div>
+    <div class="container">
+        <!-- New License Creation -->
+        <div class="card">
+            <h2>✨ ライセンス発行の儀</h2>
+            <div class="control-grid">
+                <div class="field-group">
+                    <label>プランを選択</label>
+                    <select id="tier-select">
+                        <option value="Free">Free (慈悲)</option>
+                        <option value="Standard">Standard (標準)</option>
+                        <option value="Pro">Professional (上級)</option>
+                        <option value="Ultimate">Ultimate (究極)</option>
+                    </select>
+                </div>
+                <button onclick="generateKey()">新規キーを創造する</button>
+            </div>
+        </div>
 
-    <div class="card">
-        <h2>📋 ライセンス監査台帳</h2>
-        <table id="license-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>キー</th>
-                    <th>ティア</th>
-                    <th>状態</th>
-                    <th>デバイスID</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- ここに流し込まれますわ -->
-            </tbody>
-        </table>
+        <!-- License List -->
+        <div class="card">
+            <h2>📜 ライセンス監査台帳</h2>
+            <div style="overflow-x: auto;">
+                <table id="license-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>ライセンスキー</th>
+                            <th>ティア</th>
+                            <th>状態</th>
+                            <th>紐付け機体 ID</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- サーバーから流し込まれます -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Import Section -->
+        <div class="card" style="border-color: rgba(233, 30, 99, 0.3);">
+            <h2>📥 Boothデータ一括取込</h2>
+            <div class="control-grid">
+                <div class="field-group">
+                    <label>CSVファイルを選択 (Booth注文データ)</label>
+                    <input type="file" id="csv-file" accept=".csv">
+                </div>
+                <button onclick="importCSV()" style="background: linear-gradient(135deg, #e91e63, #c2185b); color: white;">台帳を更新する</button>
+            </div>
+        </div>
     </div>
 
     <script>
+        // お嬢様の秘密のURLなので、トークン入力は不要にしました。
         async function fetchAPI(endpoint, options = {}) {
-            const token = document.getElementById('admin-token').value;
-            const res = await fetch('/api' + endpoint, {
-                ...options,
-                headers: {
-                    ...options.headers,
-                    'X-Admin-Token': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (res.status === 401) alert('お嬢様以外、認められません。');
-            return res.json();
+            try {
+                const res = await fetch('/api' + endpoint, {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return await res.json();
+            } catch (e) {
+                console.error(e);
+                alert('サーバーとの通信に失敗しましたわ。最新の状態に更新（リロード）を試みてください。');
+                return null;
+            }
+        }
+
+        function getTierBadge(tier) {
+            const cls = 'badge-' + (tier ? tier.toLowerCase() : 'free');
+            return `<span class="badge ${cls}">${tier || 'Free'}</span>`;
         }
 
         async function loadLicenses() {
             const data = await fetchAPI('/admin/licenses');
+            if (!data) return;
+
             const tbody = document.querySelector('#license-table tbody');
             tbody.innerHTML = '';
+            
             data.forEach(lic => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${lic.id}</td>
                     <td><code>${lic.license_key}</code></td>
-                    <td>${lic.tier}</td>
-                    <td>${lic.activated ? '✅ 有効' : '💤 待機'}</td>
-                    <td>${lic.machine_id || '-'}</td>
+                    <td>${getTierBadge(lic.tier)}</td>
+                    <td>${lic.status === 'Banned' ? '🚫 封印中' : (lic.activated ? '✅ 稼働中' : '💤 待機中')}</td>
+                    <td>${lic.machine_id || '<span style="color:#555">未紐付け</span>'}</td>
                     <td>
-                        <button class="btn-reset" onclick="resetLicense(${lic.id})">紐付けリセット</button>
+                        <button class="btn-action btn-reset" onclick="resetLicense(${lic.id})">紐付け抹消</button>
+                        <button class="btn-action btn-delete" onclick="deleteLicense(${lic.id})">永久削除</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -151,8 +332,8 @@
                 method: 'POST',
                 body: JSON.stringify({ tier })
             });
-            if (res.success) {
-                alert('新しいキーをこの世に生み出しました：' + res.license.license_key);
+            if (res && res.success) {
+                alert('新しいキーをこの世に生み出しました：\n' + res.license.license_key);
                 loadLicenses();
             }
         }
@@ -163,8 +344,19 @@
                 method: 'POST',
                 body: JSON.stringify({ id })
             });
-            if (res.success) {
+            if (res && res.success) {
                 alert('紐付けを断ち切りました。');
+                loadLicenses();
+            }
+        }
+
+        async function deleteLicense(id) {
+            if (!confirm('【最終警告】このライセンスを永久に抹消いたします。この操作は二度と取り消せませんが、よろしいですね、お嬢様？')) return;
+            const res = await fetchAPI('/admin/license/' + id, {
+                method: 'DELETE'
+            });
+            if (res && res.success) {
+                alert('塵も残さず抹消いたしました。');
                 loadLicenses();
             }
         }
@@ -180,12 +372,17 @@
                     method: 'POST',
                     body: JSON.stringify({ csvData })
                 });
-                if (res.success) {
+                if (res && res.success) {
                     alert(res.message);
+                    loadLicenses();
                 }
             };
             reader.readAsText(fileInput.files[0]);
         }
+        
+        // ページ読み込み時に自動でロード
+        window.onload = loadLicenses;
+        console.log("Eidolon Empress Dashboard (Passwordless) Ready.");
     </script>
 </body>
 </html>

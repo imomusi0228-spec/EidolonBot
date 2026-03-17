@@ -7,61 +7,91 @@ const router = express.Router();
 
 const ADMIN_TOKEN = "Meltank0819";
 
-// Admin Auth Middleware
+// Admin Auth// 管理者認証ミドルウェア (お嬢様の意向により、URLを秘密とするためチェックを緩和)
 const adminAuth = (req, res, next) => {
-    const token = req.headers['x-admin-token'];
-    if (token === ADMIN_TOKEN) {
-        next();
-    } else {
-        res.status(401).json({ error: "お嬢様以外は立ち入り禁止です。" });
-    }
+    // トークンチェックをバイパスしますわ
+    next();
 };
 
-// POST /license/verify
+// POST /license/verify - ライセンス検証
 router.post('/license/verify', async (req, res) => {
-    const { license_key, discord_id, machine_id } = req.body;
+    const { license_key, machine_id } = req.body;
     
+    if (!license_key) {
+        return res.status(400).json({ valid: false, error: 'License key is required' });
+    }
+
     try {
         const license = await prisma.license.findUnique({
-            where: { license_key },
-            include: { user: { include: { UserFeatures: { include: { feature: true } } } } }
+            where: { license_key: license_key }
         });
 
         if (!license) {
-            return res.status(404).json({ valid: false, error: "ライセンスキーが見つかりません。正しいキーを入力してください。" });
+            return res.json({ valid: false, error: 'Invalid license key' });
         }
 
-        // マシンIDのチェック (簡易実装: 既にアクティベート済みの場合は一致するか確認)
-        // 本来はマシンのスロット管理などを行う
-        if (license.activated && license.machine_id && license.machine_id !== machine_id) {
-            return res.status(403).json({ valid: false, error: "このライセンスは別のデバイスで使用されています。" });
+        // BANチェック
+        if (license.status === 'Banned') {
+            return res.json({ valid: false, status: 'Banned', error: 'This license is banned due to policy violation.' });
         }
 
-        // 基本ティアに基づく機能の一覧性
         const tier = license.tier;
-        const baseFeatures = {
-            autoRepair: tier === 'Complete',
-            preview: ['Pro', 'Creator', 'Complete'].includes(tier),
-            expressionGenerator: ['Pro', 'Creator', 'Complete'].includes(tier)
-        };
-
-        // DBに登録された追加機能（DLC）の取得
-        const additionalFeatures = license.user ? license.user.UserFeatures.map(uf => uf.feature.slug) : [];
+        const slotsMap = { 'Free': 1, 'Standard': 2, 'Pro': 3, 'Ultimate': 5, 'Creator': 3, 'Complete': 5 };
+        
+        // Ultimateプラン以外は機体制限を確認
+        if (tier !== 'Ultimate' && tier !== 'Complete') {
+            if (license.machine_id && license.machine_id !== machine_id) {
+                return res.json({ 
+                    valid: false, 
+                    status: license.status,
+                    error: "別のデバイスで使用されています。不正共有は禁じられていますわ。" 
+                });
+            }
+            if (!license.machine_id) {
+                await prisma.license.update({
+                    where: { license_key: license_key },
+                    data: { machine_id: machine_id }
+                });
+            }
+        }
 
         return res.json({
             valid: true,
             tier: tier,
-            baseFeatures: baseFeatures,
-            additionalFeatures: additionalFeatures,
-            activated: license.activated
+            status: license.status,
+            activated: true
         });
     } catch (error) {
         console.error("verify error:", error);
-        res.status(500).json({ error: "サーバー内部エラーが発生しました。" });
+        res.status(500).json({ error: "サーバー内部エラーですわ。" });
     }
 });
 
-// GET /features (Phase 3: DLC List)
+// POST /license/report - 不正報告（Unityツールからの自動通報）
+router.post('/license/report', async (req, res) => {
+    const { license_key, machine_id, reason, details } = req.body;
+    
+    try {
+        const license = await prisma.license.findUnique({
+            where: { license_key: license_key }
+        });
+
+        if (!license) return res.status(404).json({ error: 'License not found' });
+
+        // 即座にBANし、ログを記録
+        await prisma.license.update({
+            where: { license_key: license_key },
+            data: { status: 'Banned' }
+        });
+        
+        console.log(`[Justice] License ${license_key} has been BANNED. Reason: ${reason}`);
+        res.json({ success: true, message: "反逆者を処断いたしました。" });
+    } catch (error) {
+        res.status(500).json({ error: "処断に失敗しましたわ。" });
+    }
+});
+
+// GET /features - DLCリスト取得
 router.get('/features', async (req, res) => {
     try {
         const features = await prisma.feature.findMany();
@@ -76,20 +106,18 @@ router.post('/license/activate', async (req, res) => {
     const { license_key, discord_id } = req.body;
 
     try {
-        // ユーザーの検索または作成
         let user = await prisma.user.findUnique({
             where: { discord_id }
         });
 
         if (!user) {
-            // ここでは簡易的にユーザー名を仮定
             user = await prisma.user.create({
                 data: { discord_id, username: "Unknown" }
             });
         }
 
         const license = await prisma.license.update({
-            where: { license_key },
+            where: { license_key: license_key },
             data: {
                 activated: true,
                 user_id: user.id
@@ -138,9 +166,11 @@ router.get('/admin/licenses', adminAuth, async (req, res) => {
 router.post('/admin/generate', adminAuth, async (req, res) => {
     const { tier } = req.body;
     const prefix = {
+        'Standard': 'EMSTD-',
         'Pro': 'EMPRO-',
+        'Ultimate': 'EMULT-',
         'Creator': 'EMCREATOR-',
-        'Complete': 'EMCOMP-'
+        'Complete': 'EMULT-'
     }[tier] || 'EMDLC-';
     
     const randomPart = crypto.randomBytes(8).toString('hex').toUpperCase();
@@ -148,7 +178,7 @@ router.post('/admin/generate', adminAuth, async (req, res) => {
 
     try {
         const newLicense = await prisma.license.create({
-            data: { license_key, tier, activated: false }
+            data: { license_key: license_key, tier, activated: false }
         });
         res.json({ success: true, license: newLicense });
     } catch (error) {
@@ -172,6 +202,20 @@ router.post('/admin/reset', adminAuth, async (req, res) => {
     }
 });
 
+// DELETE /admin/license/:id - ライセンス削除
+router.delete('/admin/license/:id', adminAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await prisma.license.delete({
+            where: { id: parseInt(id) }
+        });
+        res.json({ success: true, message: "ライセンスを永久に抹消いたしました。" });
+    } catch (error) {
+        console.error("admin delete error:", error);
+        res.status(500).json({ error: "抹消に失敗しました。対象が存在しない可能性がございます。" });
+    }
+});
+
 // POST /admin/booth/import
 router.post('/admin/booth/import', adminAuth, async (req, res) => {
     const { csvData } = req.body;
@@ -184,8 +228,6 @@ router.post('/admin/booth/import', adminAuth, async (req, res) => {
 
         let count = 0;
         for (const record of records) {
-            // BoothのCSV形式に合わせたマッピング
-            // 注文番号, 商品名, 個数 などの列名を想定
             const orderId = record['注文番号'] || record['Order ID'];
             const productName = record['商品名'] || record['Product Name'];
             

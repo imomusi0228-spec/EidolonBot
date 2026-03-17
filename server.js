@@ -1,12 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { startBot } = require('./src/bot');
-const apiRouter = require('./src/api');
-const cloudRouter = require('./src/cloud');
-const aiRouter = require('./src/ai');
-const analyticsRouter = require('./src/analytics');
-const creatorRouter = require('./src/creator');
+const { startBot } = require('./bot');
+const apiRouter = require('./api');
+const cloudRouter = require('./cloud');
+const aiRouter = require('./ai');
+const analyticsRouter = require('./analytics');
+const creatorRouter = require('./creator');
 
 const app = express();
 const PORT = process.env.PORT || 8080;

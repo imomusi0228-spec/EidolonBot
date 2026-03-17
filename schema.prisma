@@ -25,11 +25,14 @@ model User {
 model License {
   id          Int      @id @default(autoincrement())
   license_key String   @unique
-  tier        String
+  tier        String   @default("Free")
+  status      String   @default("Active") // Active, Banned, Suspended, RateLimited
   activated   Boolean  @default(false)
   user_id     Int?
   user        User?    @relation(fields: [user_id], references: [id])
-  machine_id  String?
+  machine_id  String?  // 現在紐付いているメイン機体（複数台対応は別途JSON化も可だが、一旦1枠ベースでロジック対応）
+  swap_count  Int      @default(0)   // 短期間の切り替え検知用
+  last_swap_at DateTime?
   created_at  DateTime @default(now())
 }
 
